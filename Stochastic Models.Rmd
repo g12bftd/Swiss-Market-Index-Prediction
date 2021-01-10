@@ -1,0 +1,265 @@
+---
+title: "Stock Market Prediction"
+author: "Glenn Bucagu"
+date: "03/01/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/Desktop/Projects/SMI Modelling Project")
+```
+
+
+```{r imports}
+dataset <- read.csv("SSMI.csv")
+dataset[2510, ]
+```
+
+```{r simple markov model}
+up_down <- 0
+up_up <- 0
+down_up <- 0
+down_down <- 0
+
+n <- dim(dataset)[1]
+
+for (i in 1:(n-2)) {
+  if (dataset[i + 1, "Close"] > dataset[i, "Close"] & dataset[i + 2, "Close"] > dataset[i + 1, "Close"]) {
+    up_up <- up_up + 1
+  } else if (dataset[i + 1, "Close"] > dataset[i, "Close"] & dataset[i + 2, "Close"] < dataset[i + 1, "Close"]) {
+    up_down <- up_down + 1
+  } else if (dataset[i + 1, "Close"] < dataset[i, "Close"] & dataset[i + 2, "Close"] < dataset[i + 1, "Close"]) {
+    down_down <- down_down + 1
+  } else if (dataset[i + 1, "Close"] < dataset[i, "Close"] & dataset[i + 2, "Close"] > dataset[i + 1, "Close"]) {
+    down_up <- down_up + 1
+  }
+}
+
+# Turn these into probabilities
+up_down <- up_down / 1341
+up_up <- up_up / 1341
+down_up <- down_up / 1167
+down_down <- down_down / 1167
+
+
+# Construct the transition probability matrix 
+transitions <- c(up_up, up_down, down_up, down_down) 
+transitions <- matrix(data = transitions, nrow = 2, ncol = 2, byrow = TRUE)
+transitions 
+```
+
+```{r complex markov chain}
+max_diff <- 0
+min_diff <- 0
+
+for (i in 1:(n-1)) {
+  if (dataset[i + 1, "Close"] - dataset[i, "Close"] > max_diff) {
+    max_diff <- dataset[i + 1, "Close"] - dataset[i, "Close"]
+  } 
+}
+
+
+for (i in 1:(n-1)) {
+  if (dataset[i + 1, "Close"] - dataset[i, "Close"] < min_diff) {
+    min_diff <- dataset[i + 1, "Close"] - dataset[i, "Close"]
+  } 
+}
+
+max_diff # 289.9004 is the maximum increase in consecutive Close price
+min_diff # -797.5898 is the maximum decrease in consecutive Close price
+
+states <- seq(from = floor(min_diff), to = ceiling(max_diff), length.out = 6)
+states
+
+# We now define 5 states
+# The number 5 is chosen because we don't want too many states (loss of information)
+# We also don't want too few states (not enough information)
+
+transitions_complex <- matrix(0, nrow = 5, ncol = 5)
+transitions_complex
+
+for (i in 1:(n-2)) {
+  if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[2] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[2]) {
+    transitions_complex[1, 1] <- transitions_complex[1, 1]  + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[2] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[3]) {
+    transitions_complex[1, 2] <- transitions_complex[1, 2]  + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[2] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[4]) {
+    transitions_complex[1, 3] <- transitions_complex[1, 3] + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[2] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[5]) {
+    transitions_complex[1, 4] <- transitions_complex[1, 4] + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[2] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[6]) {
+    transitions_complex[1, 5] <- transitions_complex[1, 5] + 1
+    
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[3] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[2]) {
+    transitions_complex[2, 1] <- transitions_complex[2, 1] + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[3] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[3]) {
+    transitions_complex[2, 2] <- transitions_complex[2, 2] + 1 
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[3] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[4]) {
+    transitions_complex[2, 3] <- transitions_complex[2, 3] + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[3] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[5]) {
+    transitions_complex[2, 4] <- transitions_complex[2, 4] + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[3] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[6]) {
+    transitions_complex[2, 5] <- transitions_complex[2, 5] + 1
+    
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[4] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[2]) {
+    transitions_complex[3, 1] <- transitions_complex[3, 1] + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[4] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[3]) {
+    transitions_complex[3, 2] <- transitions_complex[3, 2] + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[4] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[4]) {
+    transitions_complex[3, 3] <- transitions_complex[3, 3] + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[4] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[5]) {
+    transitions_complex[3, 4] <- transitions_complex[3, 4] + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[4] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[6]) {
+    transitions_complex[3, 5] <- transitions_complex[3, 5] + 1
+    
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[5] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[2]) {
+    transitions_complex[4, 1] <- transitions_complex[4, 1] + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[5] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[3]) {
+    transitions_complex[4, 2] <- transitions_complex[4, 2] + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[5] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[4]) {
+    transitions_complex[4, 3] <- transitions_complex[4, 3] + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[5] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[5]) {
+    transitions_complex[4, 4] <- transitions_complex[4, 4] + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[5] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[6]) {
+    transitions_complex[4, 5] <- transitions_complex[4, 5] + 1
+    
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[6] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[2]) {
+    transitions_complex[5, 1] <- transitions_complex[5, 1] + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[6] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[3]) {
+    transitions_complex[5, 2] <- transitions_complex[5, 2] + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[6] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[4]) {
+    transitions_complex[5, 3] <- transitions_complex[5, 3] + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[6] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[5]) {
+    transitions_complex[5, 4] <- transitions_complex[5, 4] + 1
+  } else if ((dataset[i + 1, "Close"] - dataset[i, "Close"]) < states[6] & (dataset[i + 2, "Close"] - dataset[i + 1, "Close"]) < states[6]) {
+    transitions_complex[5, 5] <- transitions_complex[5, 5] + 1
+  }
+}
+
+transitions_complex
+
+for (i in 1:5) {
+  transitions_complex[i, ] <- transitions_complex[i, ] / sum(transitions_complex[i, ])
+}
+
+transitions_complex <- signif(transitions_complex, digits = 4)
+transitions_complex
+```
+
+
+```{r GBM model}
+
+returns = vector(length = n-1)
+
+for (i in 2:n) {
+  returns[i] <- log(dataset[i, "Close"] / dataset[i-1, "Close"])
+}
+
+plot(x = seq(from = 2010, to = 2019, length.out = 2510), y = returns, ylab = "SSMI Returns", xlab = "Year",
+     main = "Returns of the SSMI Closing Stock Price")
+
+
+
+```
+
+```{r JB hypothesis test}
+library(tseries)
+jb <- jarque.bera.test(returns)
+jb
+
+```
+
+```{r replace distributions}
+set.seed(2020)
+a <- rnorm(10^6, mean = 0, sd = 0.05/3)
+d <- density(a) # returns the density data 
+#plot(d, xlim = c(-0.2, 0.2)) # plots the results
+hist(returns, prob = T)
+
+
+
+```
+```{r bootstrap drift}
+#install.packages("boot")
+library(boot)
+m <- 5000 # for the function to work, number of repetitions must be larger than number of data rows
+meanfun <- function(data, i){
+  d <- data[i]
+  return(mean(d))   
+}
+
+bo <- boot(returns, statistic=meanfun, R=m)
+boot.ci(bo, conf=0.95, type="bca")
+plot(x = bo, xlab = "Bootstrapped SSMI Drift Means")
+
+df <- 5000-1
+t_val <- qt(0.95, df = df)
+mu_sample <- mean(bo$t)
+mu_boot <- mu_sample
+ci_boot <- 0 # [-0.0002, 0.0005]
+ci_sample <- 0 # [0.0001831941, 0.0001918717]
+
+
+
+
+```
+
+```{r bootstrap volatility}
+
+b_vol2 <- boot(data = returns,statistic = function(x,i) sd(x[i]), R = m)
+boot.ci(b_vol2, conf=0.95, type="bca")
+plot(x = b_vol2, xlab = "Bootstrapped SSMI Volatility")
+
+vol_sample <- mean(b_vol2$t)
+civ_bootstrap <- 0 # [0.0089, 0.0100]
+civ_sample <- 0
+vol_sample
+
+```
+
+```{r stochastic predictions}
+set.seed(2020)
+library(diffeqr)
+library(XRJulia)
+library(XR)
+library(JuliaCall)
+future_dataset <- read.csv("2020 SSMI.csv")
+
+plot(x = seq(from = 2511, to = 2510 + 252, by = 1), y = future_dataset$Close, col = "green", type = "l", ylab = "SSMI Closing Price (CHF)",
+     xlab = "Day (from Jan 1st. 2020)")
+
+
+```
+```{r}
+#install.packages("rappdirs")
+library(rappdirs)
+library(plotly)
+## julia_setup is quite time consuming
+ # julia <- julia_setup(installJulia = TRUE)
+
+mu_estimate <- 0.0001875329
+sigma_estimate <- 0.009346813
+
+de <- diffeqr::diffeq_setup()
+f <- function(u,p,t) {
+  return(mu_estimate*u)
+}
+g <- function(u,p,t) {
+  return(sigma_estimate*u)
+}
+u0 <- future_dataset$Close[1]
+tspan <- list(2511, 2510 + 252)
+prob <- de$SDEProblem(f,g,u0,tspan)
+sol <- de$solve(prob)
+udf <- as.data.frame(t(sapply(sol$u,identity)))
+plotly::plot_ly(udf, x = sol$t, y = sol$u, type = 'scatter', mode = 'lines')
+
+plot(x = seq(from = 2511, to = 2510 + 252, by = 1), y = future_dataset$Close, col = "green", type = "l", ylab = "SSMI Closing Price (CHF)",
+     xlab = "Day (from Jan 1st. 2010)", xlim = c(2511, 2510 + 252), ylim = c(6000, 20000), main = "Real vs. GBM Predicted SSMI Closing Stock Price for 2020")
+lines(x = sol$t, y = sol$u, type = "l", col = "red")
+legend(2501, 20550, legend=c("Real", "GBM Prediction"),
+       col=c("green", "red"), lty=1:2, cex=0.8)
+
+```
+
